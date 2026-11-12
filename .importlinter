@@ -1,0 +1,38 @@
+[importlinter]
+root_packages =
+    app
+    modules
+    mock_provider
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = Payments layers (Clean Architecture)
+type = layers
+layers =
+    (modules.payments.worker)
+    modules.payments.container
+    modules.payments.presentation
+    modules.payments.infrastructure
+    modules.payments.application
+    modules.payments.domain
+
+[importlinter:contract:domain-pure]
+name = Domain has no I/O dependencies
+type = forbidden
+source_modules =
+    modules.payments.domain
+    modules.payments.application
+forbidden_modules =
+    sqlalchemy
+    redis
+    httpx
+    fastapi
+    taskiq
+    app
+
+[importlinter:contract:mock-isolated]
+name = Mock provider is a separate service
+type = independence
+modules =
+    mock_provider
+    modules

@@ -1,0 +1,48 @@
+[project]
+name = "payments-cascade"
+version = "0.1.0"
+description = "Payment cascading service (NOWPayments -> CoinGate -> mock)"
+requires-python = ">=3.13,<3.14"
+dependencies = ["fastapi (>=0.162.4,<0.163.0)", "uvicorn[standard] (>=0.54.0,<0.55.0)", "gunicorn (>=27.0.0,<28.0.0)", "sqlalchemy[asyncio] (>=2.1.8,<3.0.0)", "asyncpg (>=0.32.0,<0.33.0)", "alembic (>=1.20.1,<2.0.0)", "redis (>=8.1.0,<9.0.0)", "taskiq (>=0.13.0,<0.14.0)", "taskiq-redis (>=1.2.4,<2.0.0)", "httpx (>=0.28.1,<0.29.0)", "pydantic (>=2.14.3,<3.0.0)", "pydantic-settings (>=2.16.2,<3.0.0)", "pyjwt (>=2.15.1,<3.0.0)", "prometheus-client (>=0.26.0,<0.27.0)", "python-multipart (>=0.0.33,<0.0.34)"]
+
+[tool.poetry]
+package-mode = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = ["integration: needs Postgres and Redis (docker compose up -d postgres redis)"]
+addopts = "-m 'not integration'"
+
+[tool.mypy]
+python_version = "3.13"
+mypy_path = "src"
+explicit_package_bases = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.2.0,<10.0.0)",
+    "pytest-asyncio (>=1.4.1.post1,<2.0.0)",
+    "respx (>=0.23.1,<0.24.0)",
+    "ruff (>=0.17.4,<0.18.0)",
+    "mypy (>=2.4.1,<3.0.0)",
+    "import-linter (>=2.16,<3.0)"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E501"]
+"src/**/migrations/**" = ["E501"]
+"scripts/**" = ["E501", "ASYNC109"]

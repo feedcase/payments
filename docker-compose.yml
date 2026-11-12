@@ -1,0 +1,85 @@
+x-app-env: &app-env
+  DB__URL: postgresql+asyncpg://payments:payments@postgres:5432/payments
+  REDIS__URL: redis://redis:6379/0
+  JWT__SECRET: ${JWT__SECRET:-dev-secret-change-me-32-bytes-minimum}
+  PUBLIC_BASE_URL: http://api:8000
+  TASK_QUEUE: taskiq
+  MOCKS: >-
+    [{"code":"mock_primary","base_url":"http://mock:9000/mock_primary","secret":"dev"},
+     {"code":"mock_backup","base_url":"http://mock:9000/mock_backup","secret":"dev"}]
+  NOWPAYMENTS__ENABLED: ${NOWPAYMENTS__ENABLED:-false}
+  NOWPAYMENTS__API_KEY: ${NOWPAYMENTS__API_KEY:-}
+  NOWPAYMENTS__IPN_SECRET: ${NOWPAYMENTS__IPN_SECRET:-}
+  NOWPAYMENTS__SANDBOX_CASE: ${NOWPAYMENTS__SANDBOX_CASE:-}
+  COINGATE__ENABLED: ${COINGATE__ENABLED:-false}
+  COINGATE__API_TOKEN: ${COINGATE__API_TOKEN:-}
+  COINGATE__CALLBACK_SECRET: ${COINGATE__CALLBACK_SECRET:-}
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: payments
+      POSTGRES_PASSWORD: payments
+      POSTGRES_DB: payments
+    ports: ["5433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payments"]
+      interval: 2s
+      retries: 20
+
+  redis:
+    image: redis:7
+    ports: ["6390:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 20
+
+  migrate:
+    build: .
+    environment: *app-env
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    build: .
+    environment: *app-env
+    ports: ["8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      mock: {condition: service_started}
+
+  worker:
+    build: .
+    environment: *app-env
+    command:
+      - taskiq
+      - worker
+      - modules.payments.worker:broker
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+
+  scheduler:
+    build: .
+    environment: *app-env
+    command:
+      - taskiq
+      - scheduler
+      - modules.payments.worker:scheduler
+    deploy:
+      replicas: 1  # расписание должен публиковать ровно один экземпляр
+    depends_on:
+      redis: {condition: service_healthy}
+
+  mock:
+    build: .
+    environment:
+      MOCK_SECRET: dev
+      MOCK_DEFAULT_SCENARIO: ok
+      MOCK_TIMEOUT_S: "30"
+    command: ["uvicorn", "mock_provider.app:app", "--host", "0.0.0.0", "--port", "9000"]
+    ports: ["9000:9000"]
